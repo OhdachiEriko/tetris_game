@@ -4,6 +4,7 @@
 from datetime import datetime
 import pprint
 import copy
+import numpy as np
 
 class Block_Controller(object):
 
@@ -46,6 +47,7 @@ class Block_Controller(object):
 
         # search best nextMove -->
         strategy = None
+        #EvalValue = 0
         LatestEvalValue = -100000
         # search with current block Shape
         for direction0 in CurrentShapeDirectionRange:
@@ -57,20 +59,20 @@ class Block_Controller(object):
 
                 # evaluate board
                 EvalValue = self.calcEvaluationValueSample(board)
+                #EvalValue += self.calcEvaluationValueSample(board)
                 # update best move
-                if EvalValue > LatestEvalValue:
-                    strategy = (direction0, x0, 1, 1)
-                    LatestEvalValue = EvalValue
-
+                #if EvalValue > LatestEvalValue:
+                #    strategy = (direction0, x0, 1, 1)
+                #    LatestEvalValue = EvalValue
                 ###test
-                ###for direction1 in NextShapeDirectionRange:
-                ###  x1Min, x1Max = self.getSearchXRange(self.NextShape_class, direction1)
-                ###  for x1 in range(x1Min, x1Max):
-                ###        board2 = self.getBoard(board, self.NextShape_class, direction1, x1)
-                ###        EvalValue = self.calcEvaluationValueSample(board2)
-                ###        if EvalValue > LatestEvalValue:
-                ###            strategy = (direction0, x0, 1, 1)
-                ###            LatestEvalValue = EvalValue
+                for direction1 in NextShapeDirectionRange:
+                    x1Min, x1Max = self.getSearchXRange(self.NextShape_class, direction1)
+                    for x1 in range(x1Min, x1Max):
+                        board2 = self.getBoard(board, self.NextShape_class, direction1, x1)
+                        EvalValue += self.calcEvaluationValueSample(board)
+                    if EvalValue > LatestEvalValue:
+                        strategy = (direction0, x0, 1, 1)
+                        LatestEvalValue = EvalValue
         # search best nextMove <--
 
         print("===", datetime.now() - t1)
@@ -137,6 +139,220 @@ class Block_Controller(object):
             _board[(_y + dy) * self.board_data_width + _x] = Shape_class.shape
         return _board
 
+
+    def calcEvaluationValueSample_(self, board):
+        #
+        # my evaluate function
+        #
+
+        # calc Evaluation Value
+        score = 0
+        score = score + self.cnt_full_9column_lines(board) * 10.0
+        if self.check_full_4lines(board):
+            score = score + 100.0
+
+        return score
+    
+
+    def check_is_hole(self, board):
+        #
+        # 穴(空のブロックの上にブロックがある状態)ならTrue、
+        # そうでなければFalseを返す
+        #
+
+        width = self.board_data_width
+        height = self.board_data_height
+
+        # for debag
+        #board = self.board
+
+        a = np.array(board).reshape(height, width)
+
+        # for debag
+        #a[:, 0] = 0
+        #a[2, 1] = 0
+        
+        # for debag
+        #print("a=\n",a)
+
+        w = 0
+        ret = 1
+        for i in range(width):
+            # for debag
+            #print("a[:, {}]={}".format(i,a[:, i]))
+            
+            if (np.any(a[:, i]) == 0):
+                ret *= 1
+
+                # for debag
+                #print("kita1 i={}".format(i))
+            else:
+                b = np.amin(np.nonzero(a[:, i]))
+                c = np.count_nonzero(a[:, i])
+
+                # for debag
+                #print("b=\n",b)
+                #print("c=\n",c)
+
+                if (b == 1):
+                    ret *= 1
+                    
+                    # for debag
+                    #print("kita2 i={}".format(i))
+                    
+                elif (b == (height - c)):
+                    ret *= 1
+
+                    # for debag
+                    #print("kita3 i={}".format(i))
+                    
+                else:
+                    ret = 0
+                    
+                    # for debag
+                    #print("kita4 i={}".format(i))
+                    
+                    break
+
+        # for debag
+        #print("ret=",ret)
+        return ret
+        
+
+    def check_empty_column0(self, board):
+        #
+        # 列0が空ならTrue、そうでなければFalseを返す
+        #
+
+        width = self.board_data_width
+        height = self.board_data_height
+
+        # for debag
+        #board = self.board
+
+        a = np.array(board).reshape(height, width)
+
+        # for debag
+        #a[:, 0] = 0
+
+        b = np.sum(a[:, 0])
+        # for debag
+        #print("a=",a)
+        #print("b=",b)
+
+        if (b == 0):
+            return True
+        else:
+            return False
+        
+    
+    def cnt_full_9column_lines(self, board):
+        #
+        # 列0〜列9のブロックが埋まっている行の数を返す
+        #
+        
+        width = self.board_data_width
+        height = self.board_data_height
+
+        # for debag
+        #board = self.board
+        #board = self.getCurrentBoard(self.board_backboard)
+
+        # for debag
+        #a = np.random.randint(0, 7, 220).reshape(height, width)
+        a = np.array(board).reshape(height, width)
+
+        # for debag
+        #a[:, 0] = 0
+
+        b = np.sum(a[:, 0])
+        c = np.prod(a[:, 1:width], axis=1)
+
+        # for debag
+        #print("a=",a)
+        #print("b=",b)
+        #print("c=",c)
+
+        full_9lines = 0
+        cnt = 0
+        for i in range(height):
+            # for debag
+            #print("a[{},0] = {}  c[{}] = {}".format(i, a[i, 0], i, c[i]))
+
+            if ((a[i, 0] == 0) and (c[i] != 0)):
+                cnt += 1
+            else:
+                if (full_9lines < cnt):
+                    full_9lines = cnt
+                cnt = 0
+
+        if (full_9lines < cnt):
+            full_9lines = cnt
+
+        # for debag
+        #print("full_9lines={}".format(full_9lines))
+
+        return full_9lines
+        
+
+    def check_full_4lines(self, board):
+        #
+        # 4行埋まっていたらTrue、そうでなければFalseを返す
+        #
+        if (self.check_full_lines(board) >= 4):
+            return True
+        else:
+            return False
+
+        
+    def check_full_lines(self, board):
+        #
+        # 列0〜列9まですべて埋まっている行が連続しているmax値を返す
+        #
+        
+        width = self.board_data_width
+        height = self.board_data_height
+
+        # for debag
+        #board = self.board
+        #board = self.getCurrentBoard(self.board_backboard)
+
+        # for debag
+        #a = np.random.randint(1, 7, 220).reshape(height, width)
+        a = np.array(board).reshape(height, width)
+
+        # for debag
+        #a[:-4, :] = 0
+
+        c = np.prod(a, axis=1)
+
+        # for debag
+        #print("a=",a)
+        #print("c=",c)
+
+        full_lines = 0
+        cnt = 0
+        for i in range(height):
+            # for debag
+            #print("c[{}] = {}".format(i, c[i]))
+
+            if (c[i] != 0):
+                cnt += 1
+            else:
+                if (full_lines < cnt):
+                    full_lines = cnt
+                cnt = 0
+
+        if (full_lines < cnt):
+            full_lines = cnt
+
+        # for debag
+        #print("full_lines={}".format(full_lines))
+
+        return full_lines
+
+
+        
     def calcEvaluationValueSample(self, board):
         #
         # sample function of evaluate board.
@@ -220,8 +436,16 @@ class Block_Controller(object):
 
         # calc Evaluation Value
         score = 0
+        if self.check_is_hole(self.board_backboard):
+            if self.check_is_hole(board):
+                score = score + 10.0
+                score = score + self.cnt_full_9column_lines(board) * 10.0
+                if self.check_empty_column0(board):
+                    score = score + 10.0
+                if self.check_full_4lines(board):
+                    score = score + 100.0
         score = score + fullLines * 10.0           # try to delete line 
-        score = score - nHoles * 1.0               # try not to make hole
+        score = score - nHoles * 100.0               # try not to make hole
         score = score - nIsolatedBlocks * 1.0      # try not to make isolated block
         score = score - absDy * 1.0                # try to put block smoothly
         #score = score - maxDy * 0.3                # maxDy
